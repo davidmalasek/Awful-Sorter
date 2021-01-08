@@ -1,41 +1,43 @@
-# Awful Sorter 2.0 by David Malášek
-import os
-import shutil
-import sys
+"""
+Awful Sorter by David Malášek - Licensed under the MIT License.
+See all versions in VERSIONS.md 
+"""
+import os, shutil, colorama
+from colorama import Fore
 
 SETTINGS = {
     "general": {
-        "createSubDirectories": True,
+        "sortToSubdirectories": False,
         "overWriteDuplicates": False,
-        "sortDuplicates": False,
-        "showDevTools": False,
     },
     "supportedExtensions": {
         "Documents": ["txt", "docx", "doc", "pdf"],
         "Spreadsheets": ["xls", "xlsx"],
-        "Scripts": ["py", "js", "php", "cpp", "cs", "html", "css", "jsx", "json"],
+        "Scripts":
+        ["py", "js", "php", "cpp", "cs", "html", "css", "jsx", "json"],
         "Images": ["png", "jpg", "jpeg", "gif", "svg"],
         "Videos": ["mp4", "mov"],
         "Compressed files": ["rar", "zip"],
         "Others": [],
     },
-    "restrictedFiles": [],
+    "restricted": [""],
 }
 
 generateTestFiles = False
 
 FILENAME = os.path.basename(__file__)
+CURRENT_PATH = os.path.dirname(__file__)
 
-currentPath = os.path.dirname(__file__)
-currentFiles = os.listdir(currentPath)
+currentFiles = os.listdir(CURRENT_PATH)
 
 generalSettings = SETTINGS["general"]
 supportedExtensions = SETTINGS["supportedExtensions"]
+restricted = SETTINGS["restricted"]
 
-restrictedFiles = SETTINGS["restrictedFiles"]
+colorama.init(autoreset=True)
 
 
-def getFolderName(fileExtension):
+def getDirectoryName(fileExtension):
     returnList = []
     for i in supportedExtensions:
         for e in supportedExtensions[i]:
@@ -47,313 +49,114 @@ def getFolderName(fileExtension):
         return list(supportedExtensions.keys())[-1]
 
 
-def createFolder(fileExtension, createDirectly=False, parentDirectoryName=""):
-    if createDirectly:
-        targetPath = os.path.join(
-            currentPath, parentDirectoryName, fileExtension.lower()
-        )
+def createDirectory(path, directoryName):
+    if not os.path.isdir(os.path.join(path, directoryName)):
+        os.makedirs(os.path.join(path, directoryName))
+
+
+def moveFile(basePath, targetPath, overWrite=False):
+    if overWrite:
+        shutil.copy(basePath, targetPath)
+        os.remove(basePath)
     else:
-        targetPath = os.path.join(currentPath, getFolderName(fileExtension.lower()))
-
-    if not os.path.isdir(targetPath):
-        os.makedirs(targetPath)
+        shutil.move(basePath, targetPath)
 
 
-def correctEnding(word, number, reversedEnding=False):
-    if number < 2:
-        if reversedEnding:
-            return word + "s"
-        else:
-            return word
-    else:
-        if reversedEnding:
-            return word
-        else:
-            if word.endswith("y"):
-                return word[: len(word) - 1] + "ies"
-            else:
-                return word + "s"
-
-
-if FILENAME in currentFiles:
-    currentFiles.remove(FILENAME)  # Remove this file from file list
-
-folders = []
-for i in currentFiles:  # Append folder names to folders list
-    if os.path.isdir(os.path.join(currentPath, i)):
-        folders.append(i)
-
-for i in folders:  # Remove folders from currentFiles list
-    currentFiles.remove(i)
+currentFiles.remove(FILENAME)  # Remove this module from file list
 
 if generateTestFiles:
     totalFiles = 0
     for i in supportedExtensions:
         for e in supportedExtensions[i]:
-            totalFiles += 1
-            with open(os.path.join(currentPath, "test." + e), "w"):
-                pass
-    print("\n" + "🔨  Generated total of " + str(totalFiles) + " test files.")
-
+            if not os.path.isfile(os.path.join(CURRENT_PATH, "test." + e)):
+                with open(os.path.join(CURRENT_PATH, "test." + e), "w"):
+                    pass
+                totalFiles += 1
+    if totalFiles != 0:
+        print(
+            (Fore.GREEN + "\nSUCCESS" + Fore.WHITE + " - Generated total of " +
+             Fore.GREEN + "{} files" + Fore.WHITE + ".").format(totalFiles))
+    else:
+        print(Fore.YELLOW + "\nWARNING" + Fore.WHITE +
+              " - Test files already generated, please set " + Fore.YELLOW +
+              "generateTestFiles" + Fore.WHITE + " to " + Fore.LIGHTCYAN_EX +
+              "False" + Fore.WHITE + ".")
 else:
-    if len(currentFiles) == 0:
-        if generalSettings["createSubDirectories"]:
-            registeredDirectories = []
-            sortIndex = 0
-            directoryIndex = 0
-            duplicatesFound = 0
+    sortIndex = 0  # Keeps track of how many files have been sorted
+    directoryList = [  # Its length keeps track of how many directories files have been sorted to
+    ]
+    duplicateIndex = 0  # Keeps track of how many duplicates have been found
 
-            _currentFiles = []
-
-            for i in folders:
-                for e in os.listdir(os.path.join(currentPath, i)):
-                    if os.path.isfile(os.path.join(currentPath, i, e)):
-                        _currentFiles.append(e)
-
-            for i in folders:
-                for e in os.listdir(os.path.join(currentPath, i)):  # Node LEVEL 1
-                    if os.path.isfile(os.path.join(currentPath, i, e)):  # Node LEVEL 2
-                        fileExtension = e.split(".")[-1]
-                        folderName = getFolderName(fileExtension)
-                        basePath = os.path.join(currentPath, i, e)
-                        createFolder(
-                            fileExtension,
-                            createDirectly=True,
-                            parentDirectoryName=folderName,
-                        )
-                        targetPath = os.path.join(
-                            currentPath, folderName, fileExtension
-                        )
-                        if not os.path.isfile(os.path.join(targetPath, e)):
-                            shutil.move(basePath, targetPath)
-                            sortIndex += 1
-                        else:
-                            duplicatesFound += 1
-
-                        if targetPath not in registeredDirectories:
-                            directoryIndex += 1
-                        registeredDirectories.append(targetPath)
-
-            if sortIndex != 0 and duplicatesFound == 0:
-                if generalSettings["showDevTools"]:
-                    print("OUTPUT 1")
-                print(
-                    "\n"
-                    + "✅  Successfuly sorted "
-                    + str(sortIndex)
-                    + " "
-                    + correctEnding("file", sortIndex)
-                    + " into "
-                    + str(directoryIndex)
-                    + " "
-                    + correctEnding("subdirectory", directoryIndex)
-                    + "."
-                )
-            elif sortIndex != 0 and duplicatesFound != 0:
-                if generalSettings["showDevTools"]:
-                    print("OUTPUT 2")
-                print(
-                    "\n"
-                    + "✅  Successfuly sorted "
-                    + str(sortIndex)
-                    + " "
-                    + correctEnding("file", sortIndex)
-                    + " into "
-                    + str(directoryIndex)
-                    + " "
-                    + correctEnding("subdirectory", directoryIndex)
-                    + "\n⚠️  Found "
-                    + str(duplicatesFound)
-                    + " "
-                    + correctEnding("duplicate", duplicatesFound)
-                    + "."
-                )
-            elif sortIndex == 0 and duplicatesFound != 0:
-                if generalSettings["showDevTools"]:
-                    print("OUTPUT 3")
-                print(
-                    "\n⚠️  Found "
-                    + str(duplicatesFound)
-                    + " "
-                    + correctEnding("duplicate", duplicatesFound)
-                    + "."
-                )
-            else:
-                if generalSettings["showDevTools"]:
-                    print("OUTPUT 4")
-                print(
-                    "\n"
-                    + "⚠️  Nothing changed => No files in current directory or subdirectories."
-                )
-            exit()
-        else:
-            print("\n" + "⚠️  Nothing changed => No files in current directory.")
-            exit()
-    else:
-        print("\n" + "⚙️  CURRENT WORKING DIRECTORY: " + currentPath)
-        checkSettingStatus = []
-        for i in generalSettings:
-            checkSettingStatus.append("✅" if generalSettings[i] else "❌")
-
-        for i in range(len(generalSettings)):
-            print(
-                "   => "
-                + list(generalSettings.keys())[i]
-                + ": "
-                + checkSettingStatus[i]
-            )
-
-        if generalSettings["overWriteDuplicates"] and generalSettings["sortDuplicates"]:
-            print(
-                "\n"
-                + "⚠️  Settings conflict => Cannot set both 'overWriteIfDuplicate' and 'sortDuplicates' to True. This will set 'sortDuplicates' to False."
-            )
-            generalSettings["sortDuplicates"] = False
-
-    didOverwrite = False
-    didThrowDuplicateError = False
-    multipleDuplicates = False
-
-    sortIndex = 0
-    directoryIndex = 0
-    duplicateErrorIndex = 0
-    multipleDuplicatesIndex = 0
-
-    registeredDirectories = []
-
-    # Main algorithm
     for i in currentFiles:
-        if os.path.isfile(os.path.join(currentPath, i)) and i not in restrictedFiles:
-            fileExtension = i.split(".")[-1]
-            folderName = getFolderName(fileExtension)
-            createFolder(fileExtension)
-            basePath = os.path.join(currentPath, i)
+        if os.path.isfile(os.path.join(CURRENT_PATH,
+                                       i)) and i not in restricted:
+            fileExtension = i.split(".")[-1].lower()
+            directoryName = getDirectoryName(fileExtension)
+            createDirectory(CURRENT_PATH, directoryName)
+            basePath = os.path.join(CURRENT_PATH, i)
 
-            sortIndex += 1
-            try:
-                if generalSettings["createSubDirectories"]:
-                    createFolder(
-                        fileExtension,
-                        createDirectly=True,
-                        parentDirectoryName=folderName,
-                    )
-                    targetPath = os.path.join(currentPath, folderName, fileExtension)
-                else:
-                    targetPath = os.path.join(currentPath, folderName)
+            if generalSettings["sortToSubdirectories"]:
+                createDirectory(os.path.join(CURRENT_PATH, directoryName),
+                                fileExtension)
+                targetPath = os.path.join(CURRENT_PATH, directoryName,
+                                          fileExtension)
+                directoryName = fileExtension
+            else:
+                targetPath = os.path.join(CURRENT_PATH, directoryName)
 
-                if generalSettings["overWriteDuplicates"] and os.path.isfile(
-                    os.path.join(targetPath, i)
-                ):
-                    didOverwrite = True
-                    shutil.copy(basePath, targetPath)
-                    os.remove(basePath)
-                else:
-                    shutil.move(basePath, targetPath)
+            if generalSettings["overWriteDuplicates"]:
+                moveFile(basePath, targetPath, overWrite=True)
+                sortIndex += 1
+            elif not os.path.isfile(os.path.join(targetPath, i)):
+                moveFile(basePath, targetPath)
+                sortIndex += 1
+            else:
+                duplicateIndex += 1
 
-                if targetPath not in registeredDirectories:
-                    directoryIndex += 1
-                registeredDirectories.append(targetPath)
+            if directoryName not in directoryList:
+                directoryList.append(directoryName)
 
-            except:
-                if generalSettings["sortDuplicates"]:
-                    targetPath = os.path.join(currentPath, "Duplicates")
-                    if not os.path.isdir(targetPath):
-                        os.makedirs(targetPath)
-                    if not os.path.isfile(os.path.join(targetPath, i)):
-                        shutil.move(basePath, targetPath)
-                    elif generalSettings["overWriteDuplicates"] and os.path.isfile(
-                        os.path.join(targetPath, i)
-                    ):
-                        didOverwrite = True
-                        shutil.copy(basePath, targetPath)
-                    else:
-                        multipleDuplicatesIndex += 1
-                        multipleDuplicates = True
+        elif os.path.isdir(os.path.join(CURRENT_PATH,
+                                        i)) and i not in restricted:
+            currentDirectoryFiles = os.listdir(os.path.join(CURRENT_PATH, i))
+            for e in currentDirectoryFiles:
+                if os.path.isfile(os.path.join(CURRENT_PATH, i, e)):
+                    fileExtension = e.split(".")[-1].lower()
+                    basePath = os.path.join(CURRENT_PATH, i, e)
+                    targetPath = os.path.join(CURRENT_PATH, i, fileExtension)
+                    if generalSettings["sortToSubdirectories"]:
+                        createDirectory(os.path.join(CURRENT_PATH, i),
+                                        fileExtension)
+                        if generalSettings["overWriteDuplicates"]:
+                            moveFile(basePath, targetPath, overWrite=True)
+                        else:
+                            moveFile(basePath, targetPath)
+                        sortIndex += 1
 
-                duplicateErrorIndex += 1
-                didThrowDuplicateError = True
+    print((Fore.LIGHTGREEN_EX + "\nCURRENT WORKING DIRECTORY: " + Fore.YELLOW +
+           "{}").format(CURRENT_PATH))
 
-    if (
-        didThrowDuplicateError
-        and generalSettings["sortDuplicates"]
-        and multipleDuplicates
-    ):
-        if generalSettings["showDevTools"]:
-            print("OUTPUT 5")
-        print(
-            "\n"
-            + "⚠️  Found "
-            + str(multipleDuplicatesIndex)
-            + " "
-            + correctEnding("duplicate", multipleDuplicatesIndex)
-            + " that already "
-            + correctEnding("exist", multipleDuplicatesIndex, reversedEnding=True)
-            + " inside Duplicates folder."
-        )
-    elif didThrowDuplicateError and generalSettings["sortDuplicates"]:
-        if generalSettings["showDevTools"]:
-            print("OUTPUT 6")
-        print(
-            "\n"
-            + "✅  Moved "
-            + str(duplicateErrorIndex)
-            + " files into Duplicates folder."
-        )
-    elif didThrowDuplicateError:
-        if generalSettings["showDevTools"]:
-            print("OUTPUT 7")
-        print(
-            "\n"
-            + "⚠️  Found "
-            + str(duplicateErrorIndex)
-            + " "
-            + correctEnding("duplicate", duplicateErrorIndex)
-            + "."
-        )
-    elif didOverwrite:
-        if generalSettings["showDevTools"]:
-            print("OUTPUT 8")
-        print(
-            "\n"
-            + "✅  Successfuly overwrited "
-            + str(sortIndex)
-            + " "
-            + correctEnding("file", sortIndex)
-            + "."
-        )
-    elif generalSettings["createSubDirectories"]:
-        if generalSettings["showDevTools"]:
-            print("OUTPUT 9")
-        afterDirectory = os.listdir(currentPath)
-        afterDirectory.remove(FILENAME)
-        print(
-            "\n"
-            + "✅  Successfuly sorted "
-            + str(sortIndex)
-            + " "
-            + correctEnding("file", sortIndex)
-            + " into "
-            + str(len(afterDirectory))
-            + " "
-            + correctEnding("directory", len(afterDirectory))
-            + " and "
-            + str(directoryIndex)
-            + " "
-            + correctEnding("subdirectory", directoryIndex)
-            + "."
-        )
+    for i in range(len(generalSettings)):
+        print(("   => {}: {}").format(
+            list(generalSettings.keys())[i],
+            Fore.GREEN + str(list(generalSettings.values())[i])
+            if list(generalSettings.values())[i] else Fore.RED +
+            str(list(generalSettings.values())[i])))
+
+    if sortIndex + len(directoryList) + duplicateIndex == 0:
+        print(Fore.YELLOW + "\nWARNING" + Fore.WHITE +
+              " - Nothing changed => No files to sort.")
     else:
-        if generalSettings["showDevTools"]:
-            print("OUTPUT 10")
-        print(
-            "\n"
-            + "✅  Successfuly sorted "
-            + str(sortIndex)
-            + " "
-            + correctEnding("file", sortIndex)
-            + " into "
-            + str(directoryIndex)
-            + " "
-            + correctEnding("directory", directoryIndex)
-            + "."
-        )
+        if sortIndex != 0 and len(directoryList) != 0:
+            print((Fore.GREEN + "\nSUCCESS" + Fore.WHITE +
+                   " - Successfully sorted " + Fore.GREEN + "{} file(s)" +
+                   Fore.WHITE + " into " + Fore.GREEN + "{} directory(s)" +
+                   Fore.WHITE + ".").format(sortIndex, len(directoryList)))
+        if duplicateIndex != 0 and sortIndex == 0:
+            print((Fore.RED + "\nDUPLICATE" + Fore.WHITE + " - Found " +
+                   Fore.RED + "{} duplicate(s)" + Fore.WHITE +
+                   ", nothing changed.").format(duplicateIndex))
+        elif duplicateIndex != 0:
+            print((Fore.RED + "\nDUPLICATE" + Fore.WHITE + " - Found " +
+                   Fore.RED + "{} duplicate(s)" + Fore.WHITE +
+                   ".").format(duplicateIndex))
